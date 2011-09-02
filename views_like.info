@@ -1,0 +1,8 @@
+name = Views Like
+description = Add a compound full text search which spans multiple fields
+core = 7.x
+package = Bestuurszaken
+dependencies[] = "views"
+
+; Views handlers
+files[] = includes/views/handlers/views_like_handler_filter_string.inc

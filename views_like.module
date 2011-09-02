@@ -1,0 +1,107 @@
+<?php
+
+/**
+ * This module allows you to create compound exposed filters. The filter form
+ * not only searches through its' associated field, but other fields too.
+ * 
+ * How to use:
+ *   a. Create a view
+ *   b. Add filters with an OR filter group
+ *   c. Set one filter as exposed
+ *   d. Configure what other filters will also be reused by the exposed input
+ * 
+ * Gotcha's
+ *   a. Only works with text fields
+ *   b. Only works with one exposed text filter in the view
+ */
+
+/**
+ * Implements hook_views_api
+ * @return array
+ */
+function views_like_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'views_like')  . '/includes/views',
+  );
+}
+
+/**
+ * Implements hook_views_pre_view
+ * @param type $view
+ * @param type $display_id
+ * @param type $args 
+ */
+function views_like_views_pre_view(&$view, &$display_id, &$args) {
+  $exposed_input = $view->get_exposed_input();   
+  $exposed_input = array_filter($exposed_input); // filter out NULL values
+  $items = $view->get_items('filter', $display_id);
+    
+  if (!empty($exposed_input)) {
+    $compound_filters = array();
+    $exposed_filter = array();
+
+    
+    foreach ($items as $id => $item) {
+      if ($item['exposed']) {
+        $exposed_filter = $item;
+        $compound_filters = (isset($item['expose']['vl_fields'])) ? $item['expose']['vl_fields'] : array();
+      }
+    }
+     
+    foreach ($compound_filters as $filter_id) {
+      if ($filter_id) {
+        $item = $items[$filter_id];
+
+        // only text_long and text_with_summary can be used to create compound filters
+        $field_name = substr($item['field'], 0, -6); 
+        $fields = field_info_fields();
+        switch ($fields[$field_name]['type']) {
+          case 'text_long' :
+          case 'text_with_summary' :          
+            if (isset($exposed_input[$exposed_filter['id']])) {
+              $item['value'] = $exposed_input[$exposed_filter['id']];
+              $view->set_item($display_id, 'filter', $filter_id, $item);
+            }
+        } 
+      }
+    }
+  } 
+  else {
+    foreach ($items as $id => $item) {
+      if ($item['exposed']) {
+        $compound_filters = $item['expose']['vl_fields'];
+      }
+    }
+    
+    foreach ($compound_filters as $filter_id) {
+      $view->set_item($display_id, 'filter', $filter_id, NULL);
+    }
+  }
+}
+
+/**
+ * Dumps the query as it is executed. Ripped from views preview and reused here
+ * @deprecated Code needs to be removed when debug is complete!!
+ * @param type $view 
+ */
+/* function views_like_views_pre_render(&$view) {
+  $query = $view->build_info['query'];
+  // Only the sql default class has a method getArguments.
+  $quoted = array();
+
+  if (get_class($view->query) == 'views_plugin_query_default') {
+    $quoted = $query->getArguments();
+    $connection = Database::getConnection();
+    foreach ($query->arguments() as $key => $val) {
+      if (is_array($val)) {
+        $quoted[$key] = implode(', ', array_map(array($connection, 'quote'), $val));
+      }
+      else {
+        $quoted[$key] = $connection->quote($val);
+      }
+    }
+  }
+  $urgh = array('<strong>' . t('Query') . '</strong>', '<pre>' . check_plain(strtr($query, $quoted)) . '</pre>');           
+  dsm($urgh);
+} */
